@@ -1,0 +1,619 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0f6b6b">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Expenses">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon-192.png">
+<title>Daily Expenses</title>
+<style>
+  :root {
+    --bg: #eef1f4; --surface: #ffffff; --ink: #1c2430; --muted: #5d6b7a; --line: #d9dfe6;
+    --accent: #0f6b6b; --accent-ink: #ffffff; --danger: #b3402f;
+    --c-food: #e07a1f; --c-travel: #2a7de1; --c-bills: #7a5cc7; --c-shopping: #d1458b;
+    --c-health: #2e9e6b; --c-fun: #c9a100; --c-other: #78879a;
+    box-sizing: border-box;
+    padding-top: env(safe-area-inset-top, 0px);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #12171d; --surface: #1b222b; --ink: #e8edf2; --muted: #93a1b1;
+      --line: #2c3642; --accent: #4cc2bd; --accent-ink: #0b1d1d; --danger: #ef8a78;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #12171d; --surface: #1b222b; --ink: #e8edf2; --muted: #93a1b1;
+    --line: #2c3642; --accent: #4cc2bd; --accent-ink: #0b1d1d; --danger: #ef8a78;
+  }
+  html { scroll-padding-top: env(safe-area-inset-top, 0px); }
+  *, *::before, *::after { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink);
+    font: 400 16px/1.5 "Source Sans 3", system-ui, -apple-system, "Segoe UI", sans-serif; }
+  .wrap { max-width: 560px; margin: 0 auto; padding: 20px 16px 56px; }
+  h1, h2, .num { font-family: "Bricolage Grotesque", "Segoe UI", system-ui, sans-serif; }
+
+  .hero { padding: 8px 4px 20px; }
+  .hero .label { color: var(--muted); font-weight: 600; margin: 0; }
+  .total { font-size: clamp(44px, 14vw, 64px); font-weight: 700; line-height: 1.05; letter-spacing: -0.02em; margin: 2px 0 0; }
+  .total small { font-size: .5em; font-weight: 500; color: var(--muted); margin-right: 4px; }
+  .total.neg { color: var(--danger); }
+  .stats { display: flex; flex-wrap: wrap; gap: 4px 18px; color: var(--muted); margin: 8px 0 0; }
+  .stats strong { color: var(--ink); font-weight: 600; }
+
+  .panel { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 16px; margin-bottom: 16px; }
+  h2 { font-size: 18px; margin: 0 0 12px; font-weight: 700; }
+
+  .seg { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; background: var(--bg); border: 1px solid var(--line); border-radius: 12px; padding: 4px; margin-bottom: 14px; }
+  .seg button { min-height: 40px; border: 0; border-radius: 9px; background: transparent; color: var(--muted); font: 600 15px "Source Sans 3", system-ui, sans-serif; cursor: pointer; }
+  .seg button[aria-pressed="true"] { background: var(--surface); color: var(--ink); box-shadow: 0 0 0 1px var(--line); }
+
+  .row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .field { display: flex; flex-direction: column; gap: 4px; margin-bottom: 10px; }
+  .field label { font-size: 14px; color: var(--muted); }
+  input, select { font: inherit; color: var(--ink); background: var(--bg); border: 1px solid var(--line);
+    border-radius: 10px; padding: 10px 12px; width: 100%; min-height: 44px; }
+  input:focus-visible, select:focus-visible, button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .amount-wrap { position: relative; }
+  .amount-wrap span { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--muted); }
+  .amount-wrap input { padding-left: 28px; font-size: 20px; font-weight: 600; }
+  .primary { width: 100%; min-height: 48px; border: 0; border-radius: 10px; cursor: pointer;
+    background: var(--accent); color: var(--accent-ink); font: 600 16px "Source Sans 3", system-ui, sans-serif; }
+  .primary:hover { filter: brightness(1.08); }
+  .error { color: var(--danger); font-size: 14px; min-height: 20px; margin: 0 0 8px; }
+  .hidden { display: none; }
+
+  .month-nav { display: flex; align-items: center; justify-content: center; gap: 4px; margin: 4px 0 12px; }
+  .month-nav button { width: 36px; height: 36px; border: 0; border-radius: 50%; background: transparent; color: var(--ink); font-size: 20px; cursor: pointer; }
+  .month-nav button:hover { background: var(--line); }
+  .month-nav button:disabled { opacity: .3; cursor: default; background: transparent; }
+  .month-label { font-weight: 600; min-width: 150px; text-align: center; }
+  .msum { text-align: center; color: var(--muted); margin: -6px 0 14px; }
+  .msum strong { color: var(--ink); font-weight: 600; }
+
+  .bar { display: flex; height: 14px; border-radius: 7px; overflow: hidden; background: var(--line); }
+  .bar div { height: 100%; }
+  .legend { list-style: none; margin: 14px 0 0; padding: 0; display: grid; gap: 8px; }
+  .legend li { display: flex; align-items: center; gap: 10px; }
+  .dot { width: 12px; height: 12px; border-radius: 3px; flex: none; }
+  .legend .name { flex: 1; }
+  .legend .pct { color: var(--muted); font-size: 14px; width: 40px; text-align: right; }
+  .legend .amt { font-weight: 600; min-width: 80px; text-align: right; }
+
+  .day { margin-bottom: 14px; }
+  .day-head { display: flex; justify-content: space-between; align-items: baseline; color: var(--muted); font-size: 14px; padding: 0 2px 6px; border-bottom: 1px solid var(--line); }
+  .day-head b { color: var(--ink); font-weight: 600; }
+  .item { display: flex; align-items: center; gap: 12px; padding: 10px 2px; border-bottom: 1px solid var(--line); }
+  .item:last-child { border-bottom: 0; }
+  .item .info { flex: 1; min-width: 0; }
+  .item .title { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .item .cat { color: var(--muted); font-size: 14px; }
+  .amt-col { text-align: right; font-variant-numeric: tabular-nums; }
+  .amt-col .price { font-weight: 600; }
+  .amt-col .price.in { color: var(--accent); }
+  .amt-col .bal { color: var(--muted); font-size: 13px; }
+  .amt-col .bal.neg { color: var(--danger); }
+  .del { border: 0; background: transparent; color: var(--muted); width: 36px; height: 36px; border-radius: 50%; cursor: pointer; font-size: 18px; }
+  .del:hover { background: var(--line); color: var(--danger); }
+  .empty { color: var(--muted); text-align: center; padding: 18px 8px; margin: 0; }
+
+  .dl-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .secondary { min-height: 48px; border: 1px solid var(--accent); border-radius: 10px; cursor: pointer;
+    background: transparent; color: var(--accent); font: 600 15px "Source Sans 3", system-ui, sans-serif; padding: 0 8px; }
+  .secondary:hover { background: var(--bg); }
+  .dl-msg { color: var(--muted); font-size: 14px; min-height: 20px; margin: 10px 0 0; }
+  .foot { display: flex; justify-content: space-between; align-items: center; color: var(--muted); font-size: 14px; padding: 4px 4px 0; gap: 8px; flex-wrap: wrap; }
+  .link { background: none; border: 0; color: var(--muted); font: inherit; text-decoration: underline; cursor: pointer; padding: 8px 4px; }
+  .link.warn { color: var(--danger); }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="hero">
+    <p class="label">Master balance</p>
+    <p class="total num" id="balWrap"><small>₹</small><span id="balance">0</span></p>
+    <p class="stats">
+      <span>Loaded <strong id="loaded">₹0</strong></span>
+      <span>Spent <strong id="spent">₹0</strong></span>
+      <span>Today <strong id="todayTotal">₹0</strong></span>
+    </p>
+  </header>
+
+  <section class="panel" aria-labelledby="addTitle">
+    <h2 id="addTitle">New entry</h2>
+    <div class="seg" role="group" aria-label="Entry type">
+      <button type="button" id="modeSpend" aria-pressed="true">Spend</button>
+      <button type="button" id="modeFund" aria-pressed="false">Add to master</button>
+    </div>
+    <form id="addForm" novalidate>
+      <div class="field">
+        <label for="amount">Amount</label>
+        <div class="amount-wrap">
+          <span>₹</span>
+          <input id="amount" type="number" inputmode="decimal" min="0" step="0.01" placeholder="0" autocomplete="off">
+        </div>
+      </div>
+      <div class="row">
+        <div class="field" id="catField">
+          <label for="category">Category</label>
+          <select id="category"></select>
+        </div>
+        <div class="field" id="dateField">
+          <label for="date">Date</label>
+          <input id="date" type="date">
+        </div>
+      </div>
+      <div class="field">
+        <label for="note">Note (optional)</label>
+        <input id="note" type="text" maxlength="80" placeholder="e.g. Lunch, auto fare" autocomplete="off">
+      </div>
+      <p class="error" id="error" role="alert"></p>
+      <button class="primary" type="submit" id="submitBtn">Add expense</button>
+    </form>
+  </section>
+
+  <div class="month-nav">
+    <button id="prev" aria-label="Previous month">‹</button>
+    <div class="month-label" id="monthLabel"></div>
+    <button id="next" aria-label="Next month">›</button>
+  </div>
+  <p class="msum" id="msum"></p>
+
+  <section class="panel" aria-labelledby="catTitle">
+    <h2 id="catTitle">Where it went</h2>
+    <div id="breakdown"></div>
+  </section>
+
+  <section class="panel" aria-labelledby="listTitle">
+    <h2 id="listTitle">History</h2>
+    <div id="list"></div>
+  </section>
+
+  <section class="panel hidden" id="dlPanel" aria-labelledby="dlTitle">
+    <h2 id="dlTitle">Download or share your data</h2>
+    <div class="dl-row">
+      <button type="button" class="secondary" id="dlAll">All data (CSV)</button>
+      <button type="button" class="secondary" id="dlMonth">This month (CSV)</button>
+    </div>
+    <div class="dl-row" style="margin-top:10px">
+      <button type="button" class="secondary" id="htmlAll">All data (HTML)</button>
+      <button type="button" class="secondary" id="htmlMonth">This month (HTML)</button>
+    </div>
+    <div class="dl-row" style="margin-top:10px;grid-template-columns:1fr">
+      <button type="button" class="primary" id="dlApp">Download app file with my data (HTML)</button>
+    </div>
+    <div class="dl-row" style="margin-top:10px">
+      <button type="button" class="secondary" id="shWa">WhatsApp summary</button>
+      <button type="button" class="secondary" id="shFile">Share CSV file</button>
+    </div>
+    <p class="dl-msg" id="dlMsg" role="status">CSV opens in Excel or Google Sheets. The app file is a working copy: open it, add entries, download it again to update, then share it.</p>
+  </section>
+
+  <div class="foot">
+    <span id="storageNote">Saved in this browser only.</span>
+    <button class="link" id="clearBtn">Clear all data</button>
+  </div>
+</div>
+
+<script type="application/json" id="seedData">null</script>
+<script>
+(function () {
+  var CATS = [
+    { id: "food", name: "Food", color: "var(--c-food)" },
+    { id: "travel", name: "Travel", color: "var(--c-travel)" },
+    { id: "bills", name: "Bills", color: "var(--c-bills)" },
+    { id: "shopping", name: "Shopping", color: "var(--c-shopping)" },
+    { id: "health", name: "Health", color: "var(--c-health)" },
+    { id: "fun", name: "Fun", color: "var(--c-fun)" },
+    { id: "other", name: "Other", color: "var(--c-other)" }
+  ];
+  var KEY_EXP = "daily-expenses-v1";
+  var KEY_FUND = "daily-expenses-funds-v1";
+  var KEY_SAVED = "daily-expenses-saved-at-v1";
+  var expenses = [], funds = [];
+  var mode = "spend";
+  var seq = 0;
+
+  function readKey(k) {
+    try { var r = localStorage.getItem(k); return r ? (JSON.parse(r) || []) : []; }
+    catch (e) { return []; }
+  }
+  function save() {
+    try {
+      localStorage.setItem(KEY_EXP, JSON.stringify(expenses));
+      localStorage.setItem(KEY_FUND, JSON.stringify(funds));
+      localStorage.setItem(KEY_SAVED, String(Date.now()));
+    } catch (e) {
+      document.getElementById("storageNote").textContent = "Storage is unavailable. Entries will be lost when you close this page.";
+    }
+  }
+  function newId() { seq += 1; return Date.now() * 100 + (seq % 100); }
+
+  function pad(n) { return n < 10 ? "0" + n : "" + n; }
+  function todayStr() { var d = new Date(); return d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate()); }
+  var viewMonth = todayStr().slice(0, 7);
+
+  function num(n) { return Number(n).toLocaleString("en-IN", { maximumFractionDigits: 2 }); }
+  function money(n) { return (n < 0 ? "−" : "") + "₹" + num(Math.abs(n)); }
+  function catOf(id) { return CATS.filter(function (c) { return c.id === id; })[0] || CATS[CATS.length - 1]; }
+  function monthLabel(ym) {
+    var p = ym.split("-");
+    return new Date(+p[0], +p[1] - 1, 1).toLocaleDateString("en-IN", { month: "long", year: "numeric" });
+  }
+  function shiftMonth(ym, d) {
+    var p = ym.split("-"), dt = new Date(+p[0], +p[1] - 1 + d, 1);
+    return dt.getFullYear() + "-" + pad(dt.getMonth() + 1);
+  }
+  function dayLabel(ds) {
+    if (ds === todayStr()) return "Today";
+    var p = ds.split("-");
+    return new Date(+p[0], +p[1] - 1, +p[2]).toLocaleDateString("en-IN", { weekday: "short", day: "numeric", month: "short" });
+  }
+  function esc(s) {
+    return String(s).replace(/[&<>"']/g, function (c) {
+      return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c];
+    });
+  }
+  function sum(arr) { return arr.reduce(function (s, e) { return s + e.amount; }, 0); }
+
+  function render() {
+    var current = todayStr().slice(0, 7);
+
+    // Master balance (all time)
+    var loaded = sum(funds), spent = sum(expenses), bal = loaded - spent;
+    document.getElementById("balance").textContent = (bal < 0 ? "−" : "") + num(Math.abs(bal));
+    document.getElementById("balWrap").className = "total num" + (bal < 0 ? " neg" : "");
+    document.getElementById("loaded").textContent = money(loaded);
+    document.getElementById("spent").textContent = money(spent);
+    document.getElementById("todayTotal").textContent = money(sum(expenses.filter(function (e) { return e.date === todayStr(); })));
+
+    // Running balance after each entry, in chronological order
+    var all = expenses.map(function (e) { return { k: "e", e: e }; })
+      .concat(funds.map(function (f) { return { k: "f", e: f }; }))
+      .sort(function (a, b) { return a.e.date < b.e.date ? -1 : a.e.date > b.e.date ? 1 : a.e.id - b.e.id; });
+    var run = 0, after = {};
+    all.forEach(function (t) { run += t.k === "f" ? t.e.amount : -t.e.amount; after[t.k + t.e.id] = run; });
+
+    // Month view
+    document.getElementById("monthLabel").textContent = monthLabel(viewMonth);
+    document.getElementById("next").disabled = viewMonth >= current;
+    var mExp = expenses.filter(function (e) { return e.date.slice(0, 7) === viewMonth; });
+    var mFund = funds.filter(function (e) { return e.date.slice(0, 7) === viewMonth; });
+    var mSpent = sum(mExp);
+    document.getElementById("msum").innerHTML = "Spent <strong>" + money(mSpent) + "</strong> &nbsp;·&nbsp; Added <strong>" + money(sum(mFund)) + "</strong>";
+
+    // Breakdown
+    var bd = document.getElementById("breakdown");
+    if (!mExp.length) {
+      bd.innerHTML = '<p class="empty">No spending in this month yet.</p>';
+    } else {
+      var sums = {};
+      mExp.forEach(function (e) { sums[e.cat] = (sums[e.cat] || 0) + e.amount; });
+      var rows = CATS.filter(function (c) { return sums[c.id]; }).sort(function (a, b) { return sums[b.id] - sums[a.id]; });
+      var bar = rows.map(function (c) {
+        return '<div style="width:' + (sums[c.id] / mSpent * 100) + '%;background:' + c.color + '" title="' + c.name + '"></div>';
+      }).join("");
+      var legend = rows.map(function (c) {
+        return '<li><span class="dot" style="background:' + c.color + '"></span><span class="name">' + c.name + '</span>' +
+          '<span class="pct">' + Math.round(sums[c.id] / mSpent * 100) + '%</span><span class="amt">' + money(sums[c.id]) + '</span></li>';
+      }).join("");
+      bd.innerHTML = '<div class="bar" role="img" aria-label="Spending by category">' + bar + '</div><ul class="legend">' + legend + '</ul>';
+    }
+
+    // History
+    var list = document.getElementById("list");
+    var tx = mExp.map(function (e) { return { k: "e", e: e }; }).concat(mFund.map(function (f) { return { k: "f", e: f }; }));
+    if (!tx.length) { list.innerHTML = '<p class="empty">Nothing here yet. Add money to your master, then record spending.</p>'; return; }
+    var byDay = {};
+    tx.forEach(function (t) { (byDay[t.e.date] = byDay[t.e.date] || []).push(t); });
+    list.innerHTML = Object.keys(byDay).sort().reverse().map(function (d) {
+      var items = byDay[d].sort(function (a, b) { return b.e.id - a.e.id; });
+      var daySpent = sum(items.filter(function (t) { return t.k === "e"; }).map(function (t) { return t.e; }));
+      return '<div class="day"><div class="day-head"><span>' + dayLabel(d) + '</span><span>' + (daySpent ? 'Spent <b>' + money(daySpent) + '</b>' : '') + '</span></div>' +
+        items.map(function (t) {
+          var e = t.e, b = after[t.k + e.id], isF = t.k === "f", c = isF ? null : catOf(e.cat);
+          var title = isF ? (e.note || "Added to master") : (e.note || c.name);
+          var sub = isF ? (e.note ? "Added to master" : "") : (e.note ? c.name : "");
+          return '<div class="item"><span class="dot" style="background:' + (isF ? 'var(--accent)' : c.color) + '"></span>' +
+            '<div class="info"><div class="title">' + esc(title) + '</div>' + (sub ? '<div class="cat">' + sub + '</div>' : '') + '</div>' +
+            '<div class="amt-col"><div class="price' + (isF ? ' in' : '') + '">' + (isF ? '+' : '−') + '₹' + num(e.amount) + '</div>' +
+            '<div class="bal' + (b < 0 ? ' neg' : '') + '">Balance ' + money(b) + '</div></div>' +
+            '<button class="del" data-k="' + t.k + '" data-id="' + e.id + '" aria-label="Delete entry">✕</button></div>';
+        }).join("") + '</div>';
+    }).join("");
+  }
+
+  // Form
+  var sel = document.getElementById("category");
+  sel.innerHTML = CATS.map(function (c) { return '<option value="' + c.id + '">' + c.name + '</option>'; }).join("");
+  var dateInput = document.getElementById("date");
+  dateInput.value = todayStr();
+
+  function setMode(m) {
+    mode = m;
+    document.getElementById("modeSpend").setAttribute("aria-pressed", m === "spend");
+    document.getElementById("modeFund").setAttribute("aria-pressed", m === "fund");
+    document.getElementById("catField").classList.toggle("hidden", m === "fund");
+    document.getElementById("dateField").style.gridColumn = m === "fund" ? "1 / -1" : "";
+    document.getElementById("submitBtn").textContent = m === "fund" ? "Add to master" : "Add expense";
+    document.getElementById("error").textContent = "";
+  }
+  document.getElementById("modeSpend").addEventListener("click", function () { setMode("spend"); });
+  document.getElementById("modeFund").addEventListener("click", function () { setMode("fund"); });
+
+  document.getElementById("addForm").addEventListener("submit", function (ev) {
+    ev.preventDefault();
+    var err = document.getElementById("error");
+    var amt = parseFloat(document.getElementById("amount").value);
+    if (!(amt > 0)) { err.textContent = "Enter an amount greater than 0."; return; }
+    if (!dateInput.value) { err.textContent = "Pick a date."; return; }
+    err.textContent = "";
+    var entry = { id: newId(), amount: Math.round(amt * 100) / 100, note: document.getElementById("note").value.trim(), date: dateInput.value };
+    if (mode === "fund") funds.push(entry);
+    else { entry.cat = sel.value; expenses.push(entry); }
+    save();
+    viewMonth = dateInput.value.slice(0, 7);
+    document.getElementById("amount").value = "";
+    document.getElementById("note").value = "";
+    render();
+    document.getElementById("amount").focus();
+  });
+
+  document.getElementById("list").addEventListener("click", function (ev) {
+    var btn = ev.target.closest(".del");
+    if (!btn) return;
+    var id = +btn.getAttribute("data-id");
+    if (btn.getAttribute("data-k") === "f") funds = funds.filter(function (e) { return e.id !== id; });
+    else expenses = expenses.filter(function (e) { return e.id !== id; });
+    save();
+    render();
+  });
+
+  document.getElementById("prev").addEventListener("click", function () { viewMonth = shiftMonth(viewMonth, -1); render(); });
+  document.getElementById("next").addEventListener("click", function () {
+    if (viewMonth < todayStr().slice(0, 7)) { viewMonth = shiftMonth(viewMonth, 1); render(); }
+  });
+
+  var clearBtn = document.getElementById("clearBtn"), clearTimer = null;
+  function disarm() { clearBtn.dataset.armed = ""; clearBtn.textContent = "Clear all data"; clearBtn.classList.remove("warn"); }
+  clearBtn.addEventListener("click", function () {
+    if (clearBtn.dataset.armed === "1") { expenses = []; funds = []; save(); clearTimeout(clearTimer); disarm(); render(); }
+    else {
+      clearBtn.dataset.armed = "1"; clearBtn.textContent = "Tap again to delete everything"; clearBtn.classList.add("warn");
+      clearTimer = setTimeout(disarm, 4000);
+    }
+  });
+
+  // Download as CSV
+  var downloads = null;
+  function csvCell(v) {
+    var s = String(v == null ? "" : v);
+    return /[",\n\r]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+  }
+  function safeText(s) { return /^[=+\-@]/.test(s) ? "'" + s : s; }
+  function buildCsv(month) {
+    var all = expenses.map(function (e) { return { k: "e", e: e }; })
+      .concat(funds.map(function (f) { return { k: "f", e: f }; }))
+      .sort(function (a, b) { return a.e.date < b.e.date ? -1 : a.e.date > b.e.date ? 1 : a.e.id - b.e.id; });
+    var rows = [["Date", "Type", "Category", "Note", "Amount (INR)", "Balance after (INR)"]];
+    var run = 0, count = 0;
+    all.forEach(function (t) {
+      var isF = t.k === "f", amt = isF ? t.e.amount : -t.e.amount;
+      run = Math.round((run + amt) * 100) / 100;
+      if (month && t.e.date.slice(0, 7) !== month) return;
+      count++;
+      rows.push([t.e.date, isF ? "Added to master" : "Spent", isF ? "" : catOf(t.e.cat).name,
+        safeText(t.e.note || ""), amt, run]);
+    });
+    return { count: count, text: "\uFEFF" + rows.map(function (r) { return r.map(csvCell).join(","); }).join("\r\n") };
+  }
+  function doDownload(month) {
+    var msg = document.getElementById("dlMsg");
+    var out = buildCsv(month);
+    if (!out.count) { msg.textContent = month ? "No entries in this month to download." : "Nothing to download yet."; return; }
+    var name = month ? "expenses-" + month + ".csv" : "expenses-all-" + todayStr() + ".csv";
+    try {
+      var blob = new Blob([out.text], { type: "text/csv;charset=utf-8" });
+      var url = URL.createObjectURL(blob);
+      var a = document.createElement("a");
+      a.href = url; a.download = name;
+      document.body.appendChild(a); a.click(); document.body.removeChild(a);
+      setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
+      msg.textContent = "Downloaded " + name + " (" + out.count + " entries).";
+    } catch (e) { msg.textContent = "Couldn't download the file here."; }
+  }
+  document.getElementById("dlAll").addEventListener("click", function () { if (downloads) doDownload(null); });
+  document.getElementById("dlMonth").addEventListener("click", function () { if (downloads) doDownload(viewMonth); });
+
+  // Share via WhatsApp
+  function summaryText(month, maxEntries) {
+    var mExp = expenses.filter(function (e) { return e.date.slice(0, 7) === month; });
+    var mFund = funds.filter(function (e) { return e.date.slice(0, 7) === month; });
+    var bal = sum(funds) - sum(expenses);
+    var lines = ["*Daily Expenses - " + monthLabel(month) + "*",
+      "Master balance: " + money(bal),
+      "Spent this month: " + money(sum(mExp)),
+      "Added this month: " + money(sum(mFund))];
+    var sums = {};
+    mExp.forEach(function (e) { sums[e.cat] = (sums[e.cat] || 0) + e.amount; });
+    var cats = CATS.filter(function (c) { return sums[c.id]; }).sort(function (a, b) { return sums[b.id] - sums[a.id]; });
+    if (cats.length) {
+      lines.push("", "*By category*");
+      cats.forEach(function (c) { lines.push(c.name + ": " + money(sums[c.id])); });
+    }
+    var tx = mExp.map(function (e) { return { f: 0, e: e }; }).concat(mFund.map(function (e) { return { f: 1, e: e }; }))
+      .sort(function (a, b) { return a.e.date < b.e.date ? -1 : a.e.date > b.e.date ? 1 : a.e.id - b.e.id; });
+    if (tx.length) {
+      var shown = tx.slice(-maxEntries);
+      lines.push("", "*Entries" + (shown.length < tx.length ? " (latest " + shown.length + " of " + tx.length + ")" : "") + "*");
+      shown.forEach(function (t) {
+        var p = t.e.date.split("-");
+        var d = new Date(+p[0], +p[1] - 1, +p[2]).toLocaleDateString("en-IN", { day: "numeric", month: "short" });
+        var label = t.f ? (t.e.note || "Added to master") : (t.e.note ? t.e.note + " (" + catOf(t.e.cat).name + ")" : catOf(t.e.cat).name);
+        lines.push(d + " - " + label + ": " + (t.f ? "+" : "-") + "Rs " + num(t.e.amount));
+      });
+    }
+    return lines.join("\n");
+  }
+  document.getElementById("shWa").addEventListener("click", function () {
+    var msg = document.getElementById("dlMsg");
+    if (!expenses.length && !funds.length) { msg.textContent = "Nothing to share yet."; return; }
+    var n = 25, text = summaryText(viewMonth, n);
+    while (encodeURIComponent(text).length > 5500 && n > 3) { n -= 5; text = summaryText(viewMonth, n); }
+    window.open("https://wa.me/?text=" + encodeURIComponent(text), "_blank");
+    msg.textContent = "WhatsApp opened. Pick who to send it to.";
+  });
+  document.getElementById("shFile").addEventListener("click", function () {
+    var msg = document.getElementById("dlMsg");
+    var out = buildCsv(viewMonth);
+    if (!out.count) { msg.textContent = "No entries in this month to share."; return; }
+    var name = "expenses-" + viewMonth + ".csv";
+    var file = null;
+    try { file = new File([out.text], name, { type: "text/csv" }); } catch (e) {}
+    if (file && navigator.canShare && navigator.canShare({ files: [file] })) {
+      navigator.share({ files: [file], title: "Daily Expenses " + monthLabel(viewMonth) })
+        .then(function () { msg.textContent = "Shared."; })
+        .catch(function () { msg.textContent = "Sharing cancelled."; });
+    } else {
+      doDownload(viewMonth);
+      msg.textContent = "File downloaded. In WhatsApp, tap the paperclip, choose Document, and pick " + name + ".";
+    }
+  });
+  downloads = true;
+  document.getElementById("dlPanel").classList.remove("hidden");
+
+
+  // Download as an HTML report
+  function saveText(name, text, count, mime) {
+    var msg = document.getElementById("dlMsg");
+    var ok = "Saved " + name + " (" + count + " entries).";
+    if (downloads && typeof downloads.save === "function") {
+      downloads.save({ filename: name, data: text }).then(function () { msg.textContent = ok; }).catch(function (err) {
+        var code = err && err.code;
+        msg.textContent = code === "declined" ? "Download cancelled."
+          : code === "rate_limited" ? "Please wait a moment and try again."
+          : "Couldn't download the file here.";
+      });
+    } else {
+      try {
+        var blob = new Blob([text], { type: mime || "text/html;charset=utf-8" });
+        var url = URL.createObjectURL(blob);
+        var a = document.createElement("a");
+        a.href = url; a.download = name;
+        document.body.appendChild(a); a.click(); document.body.removeChild(a);
+        setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
+        msg.textContent = ok;
+      } catch (e) { msg.textContent = "Couldn't download the file here."; }
+    }
+  }
+  function buildHtmlReport(month) {
+    var all = expenses.map(function (e) { return { k: "e", e: e }; })
+      .concat(funds.map(function (f) { return { k: "f", e: f }; }))
+      .sort(function (a, b) { return a.e.date < b.e.date ? -1 : a.e.date > b.e.date ? 1 : a.e.id - b.e.id; });
+    var run = 0, rows = [], spent = 0, added = 0, sums = {};
+    all.forEach(function (t) {
+      var isF = t.k === "f", amt = isF ? t.e.amount : -t.e.amount;
+      run = Math.round((run + amt) * 100) / 100;
+      if (month && t.e.date.slice(0, 7) !== month) return;
+      if (isF) added += t.e.amount; else { spent += t.e.amount; sums[t.e.cat] = (sums[t.e.cat] || 0) + t.e.amount; }
+      rows.push({ d: t.e.date, f: isF, c: isF ? "" : catOf(t.e.cat).name, n: t.e.note || "", a: amt, b: run });
+    });
+    var balance = sum(funds) - sum(expenses);
+    var title = month ? monthLabel(month) : "All data";
+    var cats = CATS.filter(function (c) { return sums[c.id]; }).sort(function (a, b) { return sums[b.id] - sums[a.id]; });
+    var catRows = cats.map(function (c) {
+      var pct = Math.round(sums[c.id] / spent * 100);
+      return "<tr><td>" + c.name + "</td><td class=r>" + money(sums[c.id]) + "</td><td class=r>" + pct + "%</td><td><div class=bar><i style=\"width:" + pct + "%\"></i></div></td></tr>";
+    }).join("");
+    var entryRows = rows.slice().reverse().map(function (r) {
+      return "<tr><td>" + r.d + "</td><td>" + (r.f ? "Added" : "Spent") + "</td><td>" + esc(r.c) + "</td><td>" + esc(r.n) + "</td><td class=r>" + (r.a < 0 ? "−" : "+") + "₹" + num(Math.abs(r.a)) + "</td><td class=r>" + money(r.b) + "</td></tr>";
+    }).join("");
+    var gen = new Date().toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" });
+    var html = '<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Daily Expenses - ' + esc(title) + '</title><style>' +
+      'body{font-family:system-ui,-apple-system,"Segoe UI",sans-serif;background:#eef1f4;color:#1c2430;margin:0;padding:20px;line-height:1.45}' +
+      '.w{max-width:760px;margin:0 auto}h1{margin:0 0 2px;font-size:26px}.s{color:#5d6b7a;margin:0 0 18px}' +
+      '.g{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:18px}' +
+      '.c{background:#fff;border:1px solid #d9dfe6;border-radius:12px;padding:12px 14px}.c small{color:#5d6b7a;display:block}.c b{font-size:22px}' +
+      '.p{background:#fff;border:1px solid #d9dfe6;border-radius:12px;padding:14px;margin-bottom:18px;overflow-x:auto}h2{font-size:17px;margin:0 0 10px}' +
+      'table{border-collapse:collapse;width:100%;font-size:14px}th,td{padding:7px 8px;border-bottom:1px solid #e6eaef;text-align:left;white-space:nowrap}' +
+      'th{color:#5d6b7a;font-weight:600}.r{text-align:right}.bar{background:#d9dfe6;height:8px;border-radius:4px;min-width:80px}.bar i{display:block;height:8px;border-radius:4px;background:#0f6b6b}' +
+      '.neg{color:#b3402f}@media print{body{background:#fff}}</style></head><body><div class="w">' +
+      '<h1>Daily Expenses</h1><p class="s">' + esc(title) + ' &middot; generated ' + gen + '</p>' +
+      '<div class="g"><div class="c"><small>Master balance</small><b' + (balance < 0 ? ' class="neg"' : '') + '>' + money(balance) + '</b></div>' +
+      '<div class="c"><small>Spent' + (month ? " this month" : "") + '</small><b>' + money(spent) + '</b></div>' +
+      '<div class="c"><small>Added' + (month ? " this month" : "") + '</small><b>' + money(added) + '</b></div></div>' +
+      (catRows ? '<div class="p"><h2>By category</h2><table><tr><th>Category</th><th class=r>Amount</th><th class=r>Share</th><th></th></tr>' + catRows + '</table></div>' : '') +
+      '<div class="p"><h2>Entries</h2><table><tr><th>Date</th><th>Type</th><th>Category</th><th>Note</th><th class=r>Amount</th><th class=r>Balance after</th></tr>' + entryRows + '</table></div>' +
+      '</div></body></html>';
+    return { count: rows.length, text: html };
+  }
+  function doHtml(month) {
+    var out = buildHtmlReport(month);
+    if (!out.count) { document.getElementById("dlMsg").textContent = month ? "No entries in this month to download." : "Nothing to download yet."; return; }
+    saveText(month ? "expenses-" + month + ".html" : "expenses-all-" + todayStr() + ".html", out.text, out.count);
+  }
+
+  // Download the whole app as one HTML file, with the current data inside
+  function buildAppFile() {
+    var clone = document.documentElement.cloneNode(true);
+    function drop(list) { Array.prototype.slice.call(list).forEach(function (n) { if (n.parentNode) n.parentNode.removeChild(n); }); }
+    Array.prototype.slice.call(clone.querySelectorAll("script")).forEach(function (sc) {
+      if (sc.id === "seedData") return;
+      if ((sc.textContent || "").indexOf("daily-expenses-v1") === -1) drop([sc]);
+    });
+    drop(clone.querySelectorAll('link[rel="manifest"], link[rel="apple-touch-icon"]'));
+    clone.removeAttribute("data-theme");
+    clone.removeAttribute("style");
+    var seed = clone.querySelector("#seedData");
+    seed.textContent = JSON.stringify({ v: 1, exportedAt: Date.now(), expenses: expenses, funds: funds }).replace(/</g, "\\u003c");
+    clone.querySelector("#list").innerHTML = "";
+    clone.querySelector("#breakdown").innerHTML = "";
+    clone.querySelector("#error").textContent = "";
+    clone.querySelector("#dlMsg").textContent = "CSV opens in Excel or Google Sheets. The app file is a working copy: open it, add entries, download it again to update, then share it.";
+    clone.querySelector("#storageNote").textContent = "Saved in this browser only.";
+    clone.querySelector("#modeSpend").setAttribute("aria-pressed", "true");
+    clone.querySelector("#modeFund").setAttribute("aria-pressed", "false");
+    clone.querySelector("#catField").classList.remove("hidden");
+    clone.querySelector("#dateField").removeAttribute("style");
+    clone.querySelector("#submitBtn").textContent = "Add expense";
+    clone.querySelector("#dlPanel").classList.add("hidden");
+    var cb = clone.querySelector("#clearBtn");
+    cb.removeAttribute("data-armed"); cb.className = "link"; cb.textContent = "Clear all data";
+    return "<!DOCTYPE html>\n" + clone.outerHTML;
+  }
+  document.getElementById("dlApp").addEventListener("click", function () {
+    saveText("expenses-app-" + todayStr() + ".html", buildAppFile(), expenses.length + funds.length, "text/html;charset=utf-8");
+  });
+
+  document.getElementById("htmlAll").addEventListener("click", function () { doHtml(null); });
+  document.getElementById("htmlMonth").addEventListener("click", function () { doHtml(viewMonth); });
+
+  expenses = readKey(KEY_EXP);
+  funds = readKey(KEY_FUND);
+  // If this file was exported with data inside, use it when it is newer than what this browser has
+  try {
+    var seedEl = document.getElementById("seedData");
+    var seed = seedEl ? JSON.parse(seedEl.textContent) : null;
+    if (seed && ((seed.expenses || []).length || (seed.funds || []).length)) {
+      var savedAt = 0;
+      try { savedAt = +localStorage.getItem(KEY_SAVED) || 0; } catch (e) {}
+      if (seed.exportedAt > savedAt) {
+        expenses = seed.expenses || []; funds = seed.funds || [];
+        save();
+        document.getElementById("storageNote").textContent = "Loaded the data saved in this file.";
+      }
+    }
+  } catch (e) {}
+  render();
+})();
+</script>
+<script>
+if ("serviceWorker" in navigator) { window.addEventListener("load", function () { navigator.serviceWorker.register("sw.js").catch(function () {}); }); }
+</script>
+</body>
+</html>
